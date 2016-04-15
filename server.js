@@ -70,6 +70,7 @@ activitiesRef.on("child_added", function(snapshot){
           else if (challenge.type == "Coop"){}
           
           challenge.progress = progress;
+          
           // update challenge
           publicChallengeRef.update(challenge);
         }
@@ -85,12 +86,38 @@ activitiesRef.on("child_added", function(snapshot){
 // ** Public challenge child changed listener
 var publicChallengeRef = new Firebase(config.firebase.url + "/public_challenges")
 publicChallengeRef.on("child_changed", function(snapshot){
-  var challenge = snapshot.val()
-  console.log("challenge progress of challenge: " + snapshot.key() + " has been updated")
+  var challenge = snapshot.val();
+  var challengeId = snapshot.key();
+  console.log("challenge progress of challenge: " + challengeId + " has been updated")
+  
+  
+  var progress = challenge.progress;
+  var challengeCompleted = false;
   
   // check challenge update with challenge completed condition
+  // also need to record who is the winner(do this maybe later)
+  Object.keys(progress).forEach(function(key){
+    var userProgress = progress[key];
+    if (userProgress >= challenge.completedCondition) {
+      challengeCompleted = true;
+    }
+  });
   
   // if completed... move challenge from active to completed table for both host and member
+  var hostUserId = challenge.createdBy
+  
+  // remove from live
+  var hostLiveChallengeRef = new Firebase(config.firebase.url + "/live_challenges/" + hostUserId + "/active/" + challengeId);
+  hostLiveChallengeRef.remove()
+  
+  // add to completed
+  var hostDeadChallengeRef = new Firebase(config.firebase.url + "/dead_challenges/" + hostUserId + "/completed/" + challengeId);
+  hostDeadChallengeRef.set(true);
+  
+  // change public challenge status to completed
+  var publicChallengeRef = new Firebase(config.firebase.url + "/public_challenges/" + challengeId);
+  
+  
 });
 
 // ** Public challenge child added listener
