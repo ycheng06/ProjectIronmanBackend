@@ -21,10 +21,18 @@ firebaseRef.authWithCustomToken(config.firebase.secret, function(error, authData
 
 // ============== Activity ========================
 // ** Public activity child added listener
+/*
+  1) public activity added
+  2) get userId of that activity
+  3) get all live challenges with userId
+  4) check if activity start date > challenge start date
+  5) Yes: depending on what challenge type it is ... update the challenge progress appropriately
+*/
 var activitiesRef = firebaseRef.child("public_activities");
 
 activitiesRef.on("child_added", function(snapshot){
   var activity = snapshot.val();
+  var activityId = snapshot.key();
   
   // get userId from activity.
   var userId = activity.userId;
@@ -69,10 +77,13 @@ activitiesRef.on("child_added", function(snapshot){
           // coop
           else if (challenge.type == "Coop"){}
           
-          challenge.progress = progress;
-          
           // update challenge
+          challenge.progress = progress;
           publicChallengeRef.update(challenge);
+          
+          // update public activity
+          var publicActivityRef = new Firebase(config.firebase.url + "/public_activities/" + activityId);
+          publicActivityRef.update({isNew: 'false'});
         }
       });
     });
@@ -84,6 +95,11 @@ activitiesRef.on("child_added", function(snapshot){
 
 // ================== Public Challenge =============================  
 // ** Public challenge child changed listener
+/*
+  1) public challenge updated
+  2) go through all the challenge progress
+  3) compare progress with challenge completed condition
+*/
 var publicChallengeRef = new Firebase(config.firebase.url + "/public_challenges")
 publicChallengeRef.on("child_changed", function(snapshot){
   var challenge = snapshot.val();
@@ -104,18 +120,26 @@ publicChallengeRef.on("child_changed", function(snapshot){
   });
   
   // if completed... move challenge from active to completed table for both host and member
-  var hostUserId = challenge.createdBy
+  if (challengeCompleted) {
+    var hostUserId = challenge.createdBy
   
-  // remove from live
-  var hostLiveChallengeRef = new Firebase(config.firebase.url + "/live_challenges/" + hostUserId + "/active/" + challengeId);
-  hostLiveChallengeRef.remove()
+    // remove from live
+    var hostLiveChallengeRef = new Firebase(config.firebase.url + "/live_challenges/" + hostUserId + "/active/" + challengeId);
+    hostLiveChallengeRef.remove()
+    
+    // add to completed
+    var hostDeadChallengeRef = new Firebase(config.firebase.url + "/dead_challenges/" + hostUserId + "/completed/" + challengeId);
+    hostDeadChallengeRef.set(true);
+    
+    // TO DO: remove challenge from member live_challenges
+    
+    // TO DO: add challenge to member dead_challenges
+    
+    // change public challenge status to completed
+    var publicChallengeRef = new Firebase(config.firebase.url + "/public_challenges/" + challengeId);
+    publicChallengeRef.update({status: 'Completed'});
+  }
   
-  // add to completed
-  var hostDeadChallengeRef = new Firebase(config.firebase.url + "/dead_challenges/" + hostUserId + "/completed/" + challengeId);
-  hostDeadChallengeRef.set(true);
-  
-  // change public challenge status to completed
-  var publicChallengeRef = new Firebase(config.firebase.url + "/public_challenges/" + challengeId);
   
   
 });
